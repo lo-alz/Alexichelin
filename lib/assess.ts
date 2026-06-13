@@ -43,6 +43,38 @@ function userPrompt(restaurant: string, location?: string): string {
 }
 
 /**
+ * Parse the tool-call arguments into JSON, tolerating the ways smaller models
+ * mangle it: markdown ```json fences, leading/trailing prose, or text wrapped
+ * around the object. Throws with a diagnostic snippet if it still can't parse.
+ */
+function parseToolJson(rawArgs: string): unknown {
+  const attempts: string[] = [rawArgs];
+  const stripped = rawArgs
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/, "")
+    .trim();
+  attempts.push(stripped);
+  const first = stripped.indexOf("{");
+  const last = stripped.lastIndexOf("}");
+  if (first >= 0 && last > first) attempts.push(stripped.slice(first, last + 1));
+
+  for (const candidate of attempts) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // try the next repair strategy
+    }
+  }
+  throw new Error(
+    `Model returned malformed JSON (len=${rawArgs.length}). Head: ${rawArgs.slice(
+      0,
+      160,
+    )} … Tail: ${rawArgs.slice(-160)}`,
+  );
+}
+
+/**
  * Research a restaurant across all sources and return a validated scorecard.
  * Uses OpenRouter with its `web` plugin for live search, then forces a
  * submit_scorecard function call which we parse and validate against the schema.
@@ -74,12 +106,7 @@ export async function assessRestaurant(
     );
   }
 
-  let raw: unknown;
-  try {
-    raw = JSON.parse(call.function.arguments);
-  } catch {
-    throw new Error("Model returned malformed JSON for the scorecard.");
-  }
+  const raw = parseToolJson(call.function.arguments);
 
   const parsed = scoreCardSchema.safeParse(raw);
   if (!parsed.success) {
