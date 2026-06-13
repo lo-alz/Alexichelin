@@ -42,6 +42,7 @@ Method:
   - Michelin: stars / Bib Gourmand / "Michelin Guide" listing, or note if not listed.
   - Reddit: overall sentiment across relevant threads (r/<city>, food subreddits).
   - Instagram: how it's portrayed/received (popularity, sentiment of comments, notable coverage).
+- Use ONLY these four sources (Reddit, Instagram, Google, Michelin) — exactly these names. Do NOT add any other source such as Uber Eats, Yelp, TripAdvisor, DoorDash, news outlets, or food blogs; fold any such findings into the closest of the four.
 - Normalize EVERY source to a 0–5 scale. Put the raw value in nativeRating (e.g. "4.5/5 (1,203 reviews)", "1 Michelin Star").
 - Be honest about confidence. If a source has little or no signal, set score to null and confidence to "low" rather than inventing a number. Never fabricate ratings or citations — only include URLs that appear in the provided web results.
 - Also capture basic facts: cuisine, price range + priceLevel (1–4), and a menu URL if one exists (else null).
@@ -140,6 +141,26 @@ function parseToolJson(rawArgs: string): unknown {
   );
 }
 
+/**
+ * Drop anything the model invented that would fail validation: sources outside
+ * the four canonical platforms, and duplicate sources. Keeps the scorecard from
+ * hard-failing when the model adds e.g. "Uber Eats" or "Food Blogs".
+ */
+function sanitizeScorecard(raw: unknown): unknown {
+  if (raw && typeof raw === "object" && Array.isArray((raw as { sources?: unknown }).sources)) {
+    const allowed = SOURCES as readonly string[];
+    const seen = new Set<string>();
+    const obj = raw as { sources: { source?: unknown }[] };
+    obj.sources = obj.sources.filter((s) => {
+      const name = typeof s?.source === "string" ? s.source : "";
+      if (!allowed.includes(name) || seen.has(name)) return false;
+      seen.add(name);
+      return true;
+    });
+  }
+  return raw;
+}
+
 /** Overwrite the Google source with authoritative Places data when we have it. */
 function applyGooglePlace(card: ScoreCard, place: GooglePlace): ScoreCard {
   const nativeRating = `${place.rating}/5 (${place.reviewCount.toLocaleString()} reviews)`;
@@ -203,7 +224,7 @@ export async function assessRestaurant(
     );
   }
 
-  const raw = parseToolJson(call.function.arguments);
+  const raw = sanitizeScorecard(parseToolJson(call.function.arguments));
 
   const parsed = scoreCardSchema.safeParse(raw);
   if (!parsed.success) {
