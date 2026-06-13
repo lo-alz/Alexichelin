@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     const message = err instanceof Error ? err.message : "Something went wrong.";
     // Missing key is a config problem (500); everything else we treat as a 502
     // (upstream model/search issue) so the UI can show a friendly retry.
-    const status = message.includes("ANTHROPIC_API_KEY") ? 500 : 502;
+    const status = message.includes("OPENROUTER_API_KEY") ? 500 : 502;
     return NextResponse.json({ error: message }, { status });
   }
 }
