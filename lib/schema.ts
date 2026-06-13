@@ -1,28 +1,46 @@
 import { z } from "zod";
 
 /**
- * The four review sources we aggregate. Adding a fifth (e.g. "Yelp" or
- * "TripAdvisor") is a one-line change here plus the prompt in lib/assess.ts.
+ * Default review sources shown in the UI. Sources are user-configurable (the
+ * Sources panel lets you add/remove), so `source` is a free string, not a fixed
+ * enum — this is just the starting set.
  */
 export const SOURCES = ["Reddit", "Instagram", "Google", "Michelin"] as const;
-export type Source = (typeof SOURCES)[number];
+export type Source = string;
+
+/** One-tap suggestions offered in the Sources panel beyond the defaults. */
+export const SUGGESTED_SOURCES = [
+  "TripAdvisor",
+  "Yelp",
+  "OpenTable",
+  "The Infatuation",
+  "Eater",
+  "TikTok",
+  "Facebook",
+] as const;
+
+/**
+ * Every field below uses `.catch(...)` so a single malformed/missing value
+ * falls back to a sane default instead of failing the whole scorecard — smaller
+ * models occasionally emit `NaN`, drop a field, or mistype one.
+ */
+const confidenceSchema = z.enum(["high", "medium", "low"]).catch("low");
 
 export const citationSchema = z.object({
-  title: z.string(),
-  url: z.string(),
+  title: z.string().catch(""),
+  url: z.string().catch(""),
 });
 
 export const sourceScoreSchema = z.object({
-  source: z.enum(SOURCES),
+  source: z.string().catch(""),
   /** Normalized 0–5 score, or null when no meaningful signal was found. */
-  // Smaller models sometimes emit numbers as strings — coerce, but keep null as null.
-  score: z.union([z.null(), z.coerce.number().min(0).max(5)]),
+  score: z.union([z.null(), z.coerce.number().min(0).max(5)]).catch(null),
   /** Native rating as found, e.g. "4.5/5 (1,203 reviews)", "1 Star", or null. */
-  nativeRating: z.string().nullable(),
-  confidence: z.enum(["high", "medium", "low"]),
-  summary: z.string(),
-  highlights: z.array(z.string()),
-  citations: z.array(citationSchema),
+  nativeRating: z.string().nullable().catch(null),
+  confidence: confidenceSchema,
+  summary: z.string().catch(""),
+  highlights: z.array(z.string().catch("")).catch([]),
+  citations: z.array(citationSchema).catch([]),
 });
 export type SourceScore = z.infer<typeof sourceScoreSchema>;
 
@@ -40,38 +58,38 @@ export const DEFAULT_CRITERIA = [
  * of the reviews (not just the headline star rating).
  */
 export const criterionScoreSchema = z.object({
-  name: z.string(),
+  name: z.string().catch(""),
   /** Normalized 0–5 score for this criterion, or null when reviews say little. */
-  score: z.union([z.null(), z.coerce.number().min(0).max(5)]),
-  confidence: z.enum(["high", "medium", "low"]),
+  score: z.union([z.null(), z.coerce.number().min(0).max(5)]).catch(null),
+  confidence: confidenceSchema,
   /** 1-sentence summary of what reviewers say about this specific criterion. */
-  summary: z.string(),
+  summary: z.string().catch(""),
 });
 export type CriterionScore = z.infer<typeof criterionScoreSchema>;
 
 export const restaurantSchema = z.object({
-  name: z.string(),
-  location: z.string(),
-  cuisine: z.string(),
+  name: z.string().catch(""),
+  location: z.string().catch(""),
+  cuisine: z.string().catch(""),
   /** Human-readable price range, e.g. "$$$ · ~$120pp". */
-  priceRange: z.string(),
+  priceRange: z.string().catch(""),
   /** 1 (cheap) – 4 (very expensive). */
-  priceLevel: z.coerce.number().int().min(1).max(4),
-  menuUrl: z.string().nullable(),
-  summary: z.string(),
+  priceLevel: z.coerce.number().int().min(1).max(4).catch(2),
+  menuUrl: z.string().nullable().catch(null),
+  summary: z.string().catch(""),
 });
 export type Restaurant = z.infer<typeof restaurantSchema>;
 
 export const scoreCardSchema = z.object({
   restaurant: restaurantSchema,
-  sources: z.array(sourceScoreSchema),
+  sources: z.array(sourceScoreSchema).catch([]),
   /** Per-criterion grades, one per criterion the user asked about. */
-  criteria: z.array(criterionScoreSchema).default([]),
-  /** Confidence-weighted average of the per-source scores, 0–5. */
-  combinedScore: z.coerce.number().min(0).max(5),
-  /** Rounded combined score for the star row, 0–5. */
-  starRating: z.coerce.number().min(0).max(5),
-  verdict: z.string(),
+  criteria: z.array(criterionScoreSchema).catch([]),
+  /** Confidence-weighted average of the per-source scores, 0–5 (recomputed server-side). */
+  combinedScore: z.coerce.number().min(0).max(5).catch(0),
+  /** Rounded combined score for the star row, 0–5 (recomputed server-side). */
+  starRating: z.coerce.number().min(0).max(5).catch(0),
+  verdict: z.string().catch(""),
 });
 export type ScoreCard = z.infer<typeof scoreCardSchema>;
 
@@ -122,7 +140,10 @@ export const scoreCardJsonSchema = {
         type: "object",
         additionalProperties: false,
         properties: {
-          source: { type: "string", enum: [...SOURCES] },
+          source: {
+            type: "string",
+            description: "The source name, matching exactly one of the requested sources.",
+          },
           score: {
             type: ["number", "null"],
             description: "Normalized 0–5 score, or null if no meaningful signal was found.",

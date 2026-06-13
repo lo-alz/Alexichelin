@@ -6,6 +6,7 @@ import { personalizedScore, roundToHalf, weightedSourceScore } from "@/lib/scori
 import SearchForm from "@/components/SearchForm";
 import CriteriaControls, { type CriterionPref } from "@/components/CriteriaControls";
 import CriteriaBreakdown from "@/components/CriteriaBreakdown";
+import SourceControls, { type SourcePref } from "@/components/SourceControls";
 import SourceWeightControls from "@/components/SourceWeightControls";
 import RestaurantHeader from "@/components/RestaurantHeader";
 import CombinedScore from "@/components/CombinedScore";
@@ -13,6 +14,7 @@ import SourceCard from "@/components/SourceCard";
 
 const PREFS_KEY = "rosette.criteria";
 const WEIGHTS_KEY = "rosette.weights";
+const SOURCES_KEY = "rosette.sources";
 
 function defaultPrefs(): CriterionPref[] {
   return DEFAULT_CRITERIA.map((name, i) => ({
@@ -21,6 +23,10 @@ function defaultPrefs(): CriterionPref[] {
     importance: 60,
     enabled: true,
   }));
+}
+
+function defaultSourcePrefs(): SourcePref[] {
+  return SOURCES.map((name, i) => ({ id: `src-default-${i}`, name, enabled: true }));
 }
 
 function defaultWeights(): Record<string, number> {
@@ -32,6 +38,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ScoreCard | null>(null);
   const [prefs, setPrefs] = useState<CriterionPref[]>(defaultPrefs);
+  const [sourcePrefs, setSourcePrefs] = useState<SourcePref[]>(defaultSourcePrefs);
   const [weights, setWeights] = useState<Record<string, number>>(defaultWeights);
 
   // Restore saved preferences once on mount.
@@ -39,6 +46,8 @@ export default function Home() {
     try {
       const p = localStorage.getItem(PREFS_KEY);
       if (p) setPrefs(JSON.parse(p));
+      const s = localStorage.getItem(SOURCES_KEY);
+      if (s) setSourcePrefs(JSON.parse(s));
       const w = localStorage.getItem(WEIGHTS_KEY);
       if (w) setWeights({ ...defaultWeights(), ...JSON.parse(w) });
     } catch {
@@ -53,6 +62,13 @@ export default function Home() {
       /* ignore */
     }
   }, [prefs]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(SOURCES_KEY, JSON.stringify(sourcePrefs));
+    } catch {
+      /* ignore */
+    }
+  }, [sourcePrefs]);
   useEffect(() => {
     try {
       localStorage.setItem(WEIGHTS_KEY, JSON.stringify(weights));
@@ -85,10 +101,11 @@ export default function Home() {
     setResult(null);
     try {
       const criteria = prefs.filter((p) => p.enabled).map((p) => p.name);
+      const sources = sourcePrefs.filter((s) => s.enabled).map((s) => s.name);
       const res = await fetch("/api/assess", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ restaurant, location: location || undefined, criteria }),
+        body: JSON.stringify({ restaurant, location: location || undefined, criteria, sources }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Request failed.");
@@ -116,8 +133,9 @@ export default function Home() {
         <SearchForm onSubmit={handleAssess} loading={loading} />
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 space-y-6">
         <CriteriaControls criteria={prefs} onChange={setPrefs} disabled={loading} />
+        <SourceControls sources={sourcePrefs} onChange={setSourcePrefs} disabled={loading} />
       </div>
 
       {loading && <LoadingState />}
@@ -192,7 +210,11 @@ function Results({
           </p>
         )}
         <div className="mb-6">
-          <SourceWeightControls weights={weights} onChange={onWeights} />
+          <SourceWeightControls
+            sources={result.sources.map((s) => s.source)}
+            weights={weights}
+            onChange={onWeights}
+          />
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
           {result.sources.map((s) => (

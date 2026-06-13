@@ -1,5 +1,6 @@
 import { callOpenRouter, MODEL } from "./openrouter";
 import { getGooglePlace, type GooglePlace } from "./places";
+import { roundToHalf, weightedSourceScore } from "./scoring";
 import { scoreCardJsonSchema, scoreCardSchema, SOURCES, type ScoreCard } from "./schema";
 
 /** Completion budget. Override with OPENROUTER_MAX_TOKENS (e.g. to fit a small balance). */
@@ -18,7 +19,7 @@ const SUBMIT_TOOL = {
   },
 };
 
-function systemPrompt(criteria: string[]): string {
+function systemPrompt(criteria: string[], sources: string[]): string {
   const criteriaBlock =
     criteria.length > 0
       ? `
@@ -31,22 +32,24 @@ Personalized criteria — the user specifically cares about: ${criteria.join(", 
 
 No personalized criteria were requested — return an empty "criteria" array.`;
 
-  return `You are a restaurant review aggregator. Given a restaurant, you assess what each of these sources thinks of it and produce one combined scorecard: ${SOURCES.join(
+  return `You are a restaurant review aggregator. Assess what each requested source thinks of the restaurant and produce one combined scorecard for these sources: ${sources.join(
     ", ",
   )}.
 
 Method:
 - Live web search results for the restaurant are provided to you. Ground your assessment in them — do not rely on prior knowledge for ratings, prices, or current status.
-- For each source, find the rating/sentiment and capture it:
-  - Google: the Google Maps star rating and review count. If "Verified Google Maps data" is provided below, use it verbatim as the Google source rating.
+- For EACH requested source, find its rating/sentiment and capture it. Guidance for common sources:
+  - Google / Google Maps: the star rating and review count. If "Verified Google Maps data" is provided below, use it verbatim.
   - Michelin: stars / Bib Gourmand / "Michelin Guide" listing, or note if not listed.
   - Reddit: overall sentiment across relevant threads (r/<city>, food subreddits).
-  - Instagram: how it's portrayed/received (popularity, sentiment of comments, notable coverage).
-- Use ONLY these four sources (Reddit, Instagram, Google, Michelin) — exactly these names. Do NOT add any other source such as Uber Eats, Yelp, TripAdvisor, DoorDash, news outlets, or food blogs; fold any such findings into the closest of the four.
+  - Instagram / TikTok: how it's portrayed/received (popularity, sentiment of comments, notable coverage).
+  - TripAdvisor / Yelp / OpenTable: that platform's star rating + review count.
+  - The Infatuation / Eater / food blogs: the critic's verdict or notable mentions.
+- Return exactly one entry per requested source, using the EXACT source name given above. Do NOT add any source that was not requested.
 - Normalize EVERY source to a 0–5 scale. Put the raw value in nativeRating (e.g. "4.5/5 (1,203 reviews)", "1 Michelin Star").
 - Be honest about confidence. If a source has little or no signal, set score to null and confidence to "low" rather than inventing a number. Never fabricate ratings or citations — only include URLs that appear in the provided web results.
 - Also capture basic facts: cuisine, price range + priceLevel (1–4), and a menu URL if one exists (else null).
-- combinedScore = a confidence-weighted average of the non-null per-source scores (weight high=1.0, medium=0.6, low=0.3). starRating = combinedScore rounded to the nearest half.${criteriaBlock}
+- combinedScore and starRating: provide your best estimate; they are recomputed server-side regardless.${criteriaBlock}
 
 Respond by calling the submit_scorecard function exactly once with the complete scorecard. Do not write a prose answer instead of calling the function.`;
 }
@@ -55,9 +58,11 @@ function userPrompt(
   restaurant: string,
   location: string | undefined,
   criteria: string[],
+  sources: string[],
   place: GooglePlace | null,
 ): string {
   const where = location?.trim() ? ` Location/context: ${location.trim()}.` : "";
+  const sourcesLine = `\nSources to assess: ${sources.join(", ")}.`;
   const criteriaLine =
     criteria.length > 0 ? `\nGrade these criteria: ${criteria.join(", ")}.` : "";
   let verified = "";
@@ -67,7 +72,7 @@ function userPrompt(
       place.mapsUri ? ` Maps: ${place.mapsUri}` : ""
     }`;
   }
-  return `Restaurant: ${restaurant.trim()}.${where}${criteriaLine}${verified}\n\nResearch all sources and submit the scorecard.`;
+  return `Restaurant: ${restaurant.trim()}.${where}${sourcesLine}${criteriaLine}${verified}\n\nResearch all sources and submit the scorecard.`;
 }
 
 /**
@@ -141,20 +146,31 @@ function parseToolJson(rawArgs: string): unknown {
   );
 }
 
+/** Loose match so "Google", "Google Maps", "google reviews" all resolve. */
+function matchesRequested(name: string, requested: string[]): string | null {
+  const n = name.trim().toLowerCase();
+  for (const r of requested) {
+    const rl = r.toLowerCase();
+    if (n === rl || n.includes(rl) || rl.includes(n)) return r;
+  }
+  return null;
+}
+
 /**
- * Drop anything the model invented that would fail validation: sources outside
- * the four canonical platforms, and duplicate sources. Keeps the scorecard from
- * hard-failing when the model adds e.g. "Uber Eats" or "Food Blogs".
+ * Keep only the sources the user actually requested (mapping loose names back to
+ * the requested spelling), drop duplicates, and discard anything the model
+ * invented. This keeps the card from hard-failing on stray sources.
  */
-function sanitizeScorecard(raw: unknown): unknown {
+function sanitizeScorecard(raw: unknown, requested: string[]): unknown {
   if (raw && typeof raw === "object" && Array.isArray((raw as { sources?: unknown }).sources)) {
-    const allowed = SOURCES as readonly string[];
     const seen = new Set<string>();
     const obj = raw as { sources: { source?: unknown }[] };
     obj.sources = obj.sources.filter((s) => {
       const name = typeof s?.source === "string" ? s.source : "";
-      if (!allowed.includes(name) || seen.has(name)) return false;
-      seen.add(name);
+      const canonical = matchesRequested(name, requested);
+      if (!canonical || seen.has(canonical)) return false;
+      s.source = canonical;
+      seen.add(canonical);
       return true;
     });
   }
@@ -164,7 +180,7 @@ function sanitizeScorecard(raw: unknown): unknown {
 /** Overwrite the Google source with authoritative Places data when we have it. */
 function applyGooglePlace(card: ScoreCard, place: GooglePlace): ScoreCard {
   const nativeRating = `${place.rating}/5 (${place.reviewCount.toLocaleString()} reviews)`;
-  const existing = card.sources.find((s) => s.source === "Google");
+  const existing = card.sources.find((s) => /google/i.test(s.source));
   if (existing) {
     existing.score = place.rating;
     existing.nativeRating = nativeRating;
@@ -197,16 +213,19 @@ export async function assessRestaurant(
   restaurant: string,
   location?: string,
   criteria: string[] = [],
+  sources: string[] = [...SOURCES],
 ): Promise<ScoreCard> {
-  // Authoritative Google data (null if no key / not found) — runs alongside the model call.
-  const place = await getGooglePlace(restaurant, location);
+  const sourceList = sources.length > 0 ? sources : [...SOURCES];
+  // Authoritative Google data only when a Google-ish source is requested.
+  const wantsGoogle = sourceList.some((s) => /google/i.test(s));
+  const place = wantsGoogle ? await getGooglePlace(restaurant, location) : null;
 
   const data = await callOpenRouter({
     model: MODEL,
     max_tokens: MAX_TOKENS,
     messages: [
-      { role: "system", content: systemPrompt(criteria) },
-      { role: "user", content: userPrompt(restaurant, location, criteria, place) },
+      { role: "system", content: systemPrompt(criteria, sourceList) },
+      { role: "user", content: userPrompt(restaurant, location, criteria, sourceList, place) },
     ],
     tools: [SUBMIT_TOOL],
     tool_choice: { type: "function", function: { name: "submit_scorecard" } },
@@ -224,12 +243,21 @@ export async function assessRestaurant(
     );
   }
 
-  const raw = sanitizeScorecard(parseToolJson(call.function.arguments));
+  const raw = sanitizeScorecard(parseToolJson(call.function.arguments), sourceList);
 
   const parsed = scoreCardSchema.safeParse(raw);
   if (!parsed.success) {
     throw new Error(`Model returned a malformed scorecard: ${parsed.error.message}`);
   }
 
-  return place ? applyGooglePlace(parsed.data, place) : parsed.data;
+  const card = place ? applyGooglePlace(parsed.data, place) : parsed.data;
+
+  // Compute the source consensus ourselves rather than trusting the model's
+  // (often flaky) numbers — confidence-weighted, equal user weight.
+  const equalWeights = Object.fromEntries(card.sources.map((s) => [s.source, 50]));
+  const consensus = weightedSourceScore(card.sources, equalWeights);
+  card.combinedScore = consensus ?? 0;
+  card.starRating = roundToHalf(card.combinedScore);
+
+  return card;
 }

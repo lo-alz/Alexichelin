@@ -10,6 +10,7 @@ const bodySchema = z.object({
   restaurant: z.string().min(1, "Enter a restaurant name.").max(200),
   location: z.string().max(200).optional(),
   criteria: z.array(z.string().min(1).max(60)).max(12).optional(),
+  sources: z.array(z.string().min(1).max(40)).max(10).optional(),
 });
 
 export async function POST(request: Request) {
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
       parsed.data.restaurant,
       parsed.data.location,
       parsed.data.criteria ?? [],
+      parsed.data.sources ?? [],
     );
     return NextResponse.json(scorecard);
   } catch (err) {

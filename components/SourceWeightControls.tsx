@@ -1,13 +1,14 @@
 "use client";
 
-import { SOURCES } from "@/lib/schema";
 import Slider, { weightLabel } from "./Slider";
 
 /** "Who to trust" — weight how much each platform counts toward the source consensus. */
 export default function SourceWeightControls({
+  sources,
   weights,
   onChange,
 }: {
+  sources: string[];
   weights: Record<string, number>;
   onChange: (next: Record<string, number>) => void;
 }) {
@@ -18,7 +19,7 @@ export default function SourceWeightControls({
         Weight each source — the consensus updates instantly.
       </p>
       <div className="mt-6 grid gap-x-10 gap-y-4 sm:grid-cols-2">
-        {SOURCES.map((s) => {
+        {sources.map((s) => {
           const v = weights[s] ?? 50;
           return (
             <div key={s} className="flex items-center gap-4">
