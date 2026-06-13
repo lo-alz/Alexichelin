@@ -1,6 +1,11 @@
 import { callOpenRouter, MODEL } from "./openrouter";
 import { scoreCardJsonSchema, scoreCardSchema, SOURCES, type ScoreCard } from "./schema";
 
+/** Completion budget. Override with OPENROUTER_MAX_TOKENS (e.g. to fit a small balance). */
+const MAX_TOKENS = Number(process.env.OPENROUTER_MAX_TOKENS) || 16000;
+/** Number of live web-search results to inject. Override with OPENROUTER_WEB_RESULTS. */
+const WEB_RESULTS = Number(process.env.OPENROUTER_WEB_RESULTS) || 5;
+
 /** OpenRouter (OpenAI-style) function tool used to get structured output back. */
 const SUBMIT_TOOL = {
   type: "function",
@@ -48,7 +53,7 @@ export async function assessRestaurant(
 ): Promise<ScoreCard> {
   const data = await callOpenRouter({
     model: MODEL,
-    max_tokens: 16000,
+    max_tokens: MAX_TOKENS,
     messages: [
       { role: "system", content: systemPrompt() },
       { role: "user", content: userPrompt(restaurant, location) },
@@ -56,7 +61,7 @@ export async function assessRestaurant(
     tools: [SUBMIT_TOOL],
     tool_choice: { type: "function", function: { name: "submit_scorecard" } },
     // OpenRouter web plugin: runs live searches and injects results into context.
-    plugins: [{ id: "web", max_results: 5 }],
+    plugins: [{ id: "web", max_results: WEB_RESULTS }],
   });
 
   const toolCalls = data.choices?.[0]?.message?.tool_calls ?? [];
