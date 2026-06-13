@@ -11,7 +11,8 @@ const CONFIDENCE_DOTS = { high: 3, medium: 2, low: 1 } as const;
  * expand the summary, highlights and citations. Mobile-first.
  */
 export default function SourceCard({ source }: { source: SourceScore }) {
-  const [open, setOpen] = useState(false);
+  // Expanded by default so the summary/reviews are visible; tap to collapse.
+  const [open, setOpen] = useState(true);
   const hasScore = source.score !== null;
   const hasDetail =
     !!source.summary || source.highlights.length > 0 || source.citations.length > 0;
