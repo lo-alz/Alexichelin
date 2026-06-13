@@ -9,6 +9,7 @@ export const maxDuration = 60;
 const bodySchema = z.object({
   restaurant: z.string().min(1, "Enter a restaurant name.").max(200),
   location: z.string().max(200).optional(),
+  criteria: z.array(z.string().min(1).max(60)).max(12).optional(),
 });
 
 export async function POST(request: Request) {
@@ -28,7 +29,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    const scorecard = await assessRestaurant(parsed.data.restaurant, parsed.data.location);
+    const scorecard = await assessRestaurant(
+      parsed.data.restaurant,
+      parsed.data.location,
+      parsed.data.criteria ?? [],
+    );
     return NextResponse.json(scorecard);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Something went wrong.";

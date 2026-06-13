@@ -1,26 +1,94 @@
 "use client";
 
-import { useState } from "react";
-import type { ScoreCard } from "@/lib/schema";
+import { useEffect, useMemo, useState } from "react";
+import { DEFAULT_CRITERIA, SOURCES, type ScoreCard } from "@/lib/schema";
+import { personalizedScore, roundToHalf, weightedSourceScore } from "@/lib/scoring";
 import SearchForm from "@/components/SearchForm";
+import CriteriaControls, { type CriterionPref } from "@/components/CriteriaControls";
+import CriteriaBreakdown from "@/components/CriteriaBreakdown";
+import SourceWeightControls from "@/components/SourceWeightControls";
 import RestaurantHeader from "@/components/RestaurantHeader";
 import CombinedScore from "@/components/CombinedScore";
 import SourceCard from "@/components/SourceCard";
+
+const PREFS_KEY = "rosette.criteria";
+const WEIGHTS_KEY = "rosette.weights";
+
+function defaultPrefs(): CriterionPref[] {
+  return DEFAULT_CRITERIA.map((name, i) => ({
+    id: `default-${i}`,
+    name,
+    importance: 60,
+    enabled: true,
+  }));
+}
+
+function defaultWeights(): Record<string, number> {
+  return Object.fromEntries(SOURCES.map((s) => [s, 50]));
+}
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ScoreCard | null>(null);
+  const [prefs, setPrefs] = useState<CriterionPref[]>(defaultPrefs);
+  const [weights, setWeights] = useState<Record<string, number>>(defaultWeights);
+
+  // Restore saved preferences once on mount.
+  useEffect(() => {
+    try {
+      const p = localStorage.getItem(PREFS_KEY);
+      if (p) setPrefs(JSON.parse(p));
+      const w = localStorage.getItem(WEIGHTS_KEY);
+      if (w) setWeights({ ...defaultWeights(), ...JSON.parse(w) });
+    } catch {
+      /* ignore malformed storage */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    } catch {
+      /* ignore */
+    }
+  }, [prefs]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(WEIGHTS_KEY, JSON.stringify(weights));
+    } catch {
+      /* ignore */
+    }
+  }, [weights]);
+
+  const importances = useMemo(
+    () => Object.fromEntries(prefs.map((p) => [p.name, p.importance])),
+    [prefs],
+  );
+
+  const personalized = useMemo(
+    () => (result ? personalizedScore(result.criteria, importances) : null),
+    [result, importances],
+  );
+  const consensus = useMemo(
+    () => (result ? weightedSourceScore(result.sources, weights) : null),
+    [result, weights],
+  );
+
+  function setImportance(name: string, value: number) {
+    setPrefs((prev) => prev.map((p) => (p.name === name ? { ...p, importance: value } : p)));
+  }
 
   async function handleAssess(restaurant: string, location: string) {
     setLoading(true);
     setError(null);
     setResult(null);
     try {
+      const criteria = prefs.filter((p) => p.enabled).map((p) => p.name);
       const res = await fetch("/api/assess", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ restaurant, location: location || undefined }),
+        body: JSON.stringify({ restaurant, location: location || undefined, criteria }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error ?? "Request failed.");
@@ -35,16 +103,12 @@ export default function Home() {
   return (
     <main className="mx-auto max-w-4xl px-6 py-16 sm:py-24">
       <header className="text-center">
-        <h1 className="font-display text-6xl font-semibold tracking-tight sm:text-7xl">
-          Rosette
-        </h1>
+        <h1 className="font-display text-6xl font-semibold tracking-tight sm:text-7xl">Rosette</h1>
         <div className="mx-auto mt-5 h-px w-16 bg-gold" />
-        <p className="mt-5 font-display text-xl italic text-muted">
-          Every review, one verdict.
-        </p>
+        <p className="mt-5 font-display text-xl italic text-muted">Every review, one verdict.</p>
         <p className="mx-auto mt-3 max-w-xl text-ink/70">
           A restaurant&apos;s standing across Reddit, Instagram, Google and the Michelin Guide —
-          considered, weighed, and distilled into a single score.
+          graded against what <em>you</em> care about, and distilled into one personalized score.
         </p>
       </header>
 
@@ -52,9 +116,23 @@ export default function Home() {
         <SearchForm onSubmit={handleAssess} loading={loading} />
       </div>
 
+      <div className="mt-8">
+        <CriteriaControls criteria={prefs} onChange={setPrefs} disabled={loading} />
+      </div>
+
       {loading && <LoadingState />}
       {error && !loading && <ErrorState message={error} />}
-      {result && !loading && <Results result={result} />}
+      {result && !loading && (
+        <Results
+          result={result}
+          personalized={personalized}
+          consensus={consensus}
+          importances={importances}
+          onImportance={setImportance}
+          weights={weights}
+          onWeights={setWeights}
+        />
+      )}
       {!result && !loading && !error && <EmptyState />}
 
       <footer className="mt-24 border-t border-line pt-6 text-center text-sm italic text-muted">
@@ -64,17 +142,58 @@ export default function Home() {
   );
 }
 
-function Results({ result }: { result: ScoreCard }) {
+function Results({
+  result,
+  personalized,
+  consensus,
+  importances,
+  onImportance,
+  weights,
+  onWeights,
+}: {
+  result: ScoreCard;
+  personalized: number | null;
+  consensus: number | null;
+  importances: Record<string, number>;
+  onImportance: (name: string, value: number) => void;
+  weights: Record<string, number>;
+  onWeights: (next: Record<string, number>) => void;
+}) {
+  const hero =
+    personalized !== null
+      ? { label: "Your Score", score: personalized, subtitle: "Personalized to what you value." }
+      : { label: "Combined Score", score: result.combinedScore, subtitle: undefined };
+
   return (
     <section className="mt-16 space-y-12">
       <RestaurantHeader restaurant={result.restaurant} />
+
       <CombinedScore
-        combinedScore={result.combinedScore}
-        starRating={result.starRating}
+        label={hero.label}
+        score={hero.score}
+        starRating={roundToHalf(hero.score)}
         verdict={result.verdict}
+        subtitle={hero.subtitle}
       />
+
+      {result.criteria.length > 0 && (
+        <CriteriaBreakdown
+          criteria={result.criteria}
+          importances={importances}
+          onImportance={onImportance}
+        />
+      )}
+
       <div>
-        <p className="label mb-5 text-center">By Source</p>
+        <p className="label mb-1 text-center">By Source</p>
+        {consensus !== null && (
+          <p className="mb-6 text-center font-display text-lg italic text-muted">
+            Weighted consensus {consensus.toFixed(1)} / 5
+          </p>
+        )}
+        <div className="mb-6">
+          <SourceWeightControls weights={weights} onChange={onWeights} />
+        </div>
         <div className="grid gap-5 sm:grid-cols-2">
           {result.sources.map((s) => (
             <SourceCard key={s.source} source={s} />
@@ -91,8 +210,8 @@ function LoadingState() {
       <p className="font-display text-2xl italic text-ink">Consulting the sources…</p>
       <div className="mx-auto mt-5 h-px w-12 animate-pulse bg-gold" />
       <p className="mt-4 text-sm text-muted">
-        Reading Reddit, Instagram, Google and the Michelin Guide. A moment, please — twenty to
-        forty seconds.
+        Reading Reddit, Instagram, Google and the Michelin Guide, and grading your criteria. A
+        moment, please — twenty to forty seconds.
       </p>
     </div>
   );

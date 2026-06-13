@@ -26,6 +26,29 @@ export const sourceScoreSchema = z.object({
 });
 export type SourceScore = z.infer<typeof sourceScoreSchema>;
 
+/** Default criteria offered in the UI; users can add their own. */
+export const DEFAULT_CRITERIA = [
+  "Food & drink",
+  "Service",
+  "Ambiance",
+  "Value",
+  "Accessibility",
+] as const;
+
+/**
+ * The AI's grade for a single user-chosen criterion, derived from the substance
+ * of the reviews (not just the headline star rating).
+ */
+export const criterionScoreSchema = z.object({
+  name: z.string(),
+  /** Normalized 0–5 score for this criterion, or null when reviews say little. */
+  score: z.union([z.null(), z.coerce.number().min(0).max(5)]),
+  confidence: z.enum(["high", "medium", "low"]),
+  /** 1-sentence summary of what reviewers say about this specific criterion. */
+  summary: z.string(),
+});
+export type CriterionScore = z.infer<typeof criterionScoreSchema>;
+
 export const restaurantSchema = z.object({
   name: z.string(),
   location: z.string(),
@@ -42,6 +65,8 @@ export type Restaurant = z.infer<typeof restaurantSchema>;
 export const scoreCardSchema = z.object({
   restaurant: restaurantSchema,
   sources: z.array(sourceScoreSchema),
+  /** Per-criterion grades, one per criterion the user asked about. */
+  criteria: z.array(criterionScoreSchema).default([]),
   /** Confidence-weighted average of the per-source scores, 0–5. */
   combinedScore: z.coerce.number().min(0).max(5),
   /** Rounded combined score for the star row, 0–5. */
@@ -129,6 +154,32 @@ export const scoreCardJsonSchema = {
         required: ["source", "score", "nativeRating", "confidence", "summary", "highlights", "citations"],
       },
     },
+    criteria: {
+      type: "array",
+      description:
+        "One entry per criterion the user asked to be graded on. Empty array if none were requested.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          name: {
+            type: "string",
+            description: "The criterion name, matching exactly the one requested.",
+          },
+          score: {
+            type: ["number", "null"],
+            description:
+              "Normalized 0–5 grade for this criterion derived from the substance of the reviews, or null if reviews say little about it.",
+          },
+          confidence: { type: "string", enum: ["high", "medium", "low"] },
+          summary: {
+            type: "string",
+            description: "1 sentence on what reviewers specifically say about this criterion.",
+          },
+        },
+        required: ["name", "score", "confidence", "summary"],
+      },
+    },
     combinedScore: {
       type: "number",
       description: "Confidence-weighted average of the per-source scores, 0–5, one decimal.",
@@ -139,5 +190,5 @@ export const scoreCardJsonSchema = {
     },
     verdict: { type: "string", description: "One-line overall takeaway." },
   },
-  required: ["restaurant", "sources", "combinedScore", "starRating", "verdict"],
+  required: ["restaurant", "sources", "criteria", "combinedScore", "starRating", "verdict"],
 } as const;
