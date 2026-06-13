@@ -58,55 +58,67 @@ export default function SourceControls({
         Choose which platforms to aggregate and how much each one counts.
       </p>
 
-      <div className="mt-5 space-y-3.5">
+      <div className="mt-5 space-y-5 sm:space-y-3.5">
         {sources.map((s) => (
-          <div key={s.id} className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => update(s.id, { enabled: !s.enabled })}
-              disabled={disabled}
-              aria-pressed={s.enabled}
-              className={`h-[18px] w-[18px] shrink-0 rounded-full border transition-all ${
-                s.enabled
-                  ? "border-transparent bg-gradient-to-br from-[#c2a566] to-[#8a6f3d] shadow-[0_1px_3px_rgba(33,28,22,0.3)]"
-                  : "border-line bg-transparent hover:border-gold"
-              }`}
-              title={s.enabled ? "Enabled" : "Disabled"}
-            />
-            <span
-              className={`w-24 shrink-0 font-display text-lg ${
-                s.enabled ? "text-ink" : "text-muted line-through"
-              }`}
-            >
-              {s.name}
-            </span>
-            <div className="flex-1">
-              <Slider
-                value={s.weight}
-                onChange={(v) => update(s.id, { weight: v })}
-                disabled={disabled || !s.enabled}
-                ariaLabel={`${s.name} weight`}
-              />
-            </div>
-            <span
-              className={`label w-16 shrink-0 text-right !text-[0.625rem] ${
-                s.enabled ? "text-gold" : "text-line"
-              }`}
-            >
-              {s.enabled ? weightLabel(s.weight) : "—"}
-            </span>
-            {s.custom && (
+          <div key={s.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <div className="flex items-center gap-3 sm:w-28 sm:shrink-0">
               <button
                 type="button"
-                onClick={() => remove(s.id)}
+                onClick={() => update(s.id, { enabled: !s.enabled })}
                 disabled={disabled}
-                className="shrink-0 text-muted transition-colors hover:text-ink"
-                aria-label={`Remove ${s.name}`}
-                title="Remove"
+                aria-pressed={s.enabled}
+                className={`h-[18px] w-[18px] shrink-0 rounded-full border transition-all ${
+                  s.enabled
+                    ? "border-transparent bg-gradient-to-br from-[#c2a566] to-[#8a6f3d] shadow-[0_1px_3px_rgba(33,28,22,0.3)]"
+                    : "border-line bg-transparent hover:border-gold"
+                }`}
+                title={s.enabled ? "Enabled" : "Disabled"}
+              />
+              <span
+                className={`flex-1 truncate font-display text-lg sm:flex-none ${
+                  s.enabled ? "text-ink" : "text-muted line-through"
+                }`}
               >
-                ×
-              </button>
-            )}
+                {s.name}
+              </span>
+              <span
+                className={`label shrink-0 !text-[0.625rem] sm:hidden ${
+                  s.enabled ? "text-gold" : "text-line"
+                }`}
+              >
+                {s.enabled ? weightLabel(s.weight) : "—"}
+              </span>
+              {s.custom && (
+                <button
+                  type="button"
+                  onClick={() => remove(s.id)}
+                  disabled={disabled}
+                  className="shrink-0 text-muted transition-colors hover:text-ink"
+                  aria-label={`Remove ${s.name}`}
+                  title="Remove"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 sm:flex-1">
+              <div className="flex-1">
+                <Slider
+                  value={s.weight}
+                  onChange={(v) => update(s.id, { weight: v })}
+                  disabled={disabled || !s.enabled}
+                  ariaLabel={`${s.name} weight`}
+                />
+              </div>
+              <span
+                className={`label hidden w-16 shrink-0 text-right !text-[0.625rem] sm:inline ${
+                  s.enabled ? "text-gold" : "text-line"
+                }`}
+              >
+                {s.enabled ? weightLabel(s.weight) : "—"}
+              </span>
+            </div>
           </div>
         ))}
       </div>

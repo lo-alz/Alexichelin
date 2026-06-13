@@ -65,59 +65,69 @@ export default function CriteriaControls({
         reviewers actually say about each.
       </p>
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 space-y-5 sm:space-y-4">
         {criteria.map((c) => (
-          <div key={c.id} className="flex items-center gap-4">
-            <button
-              type="button"
-              onClick={() => update(c.id, { enabled: !c.enabled })}
-              disabled={disabled}
-              aria-pressed={c.enabled}
-              className={`h-[18px] w-[18px] shrink-0 rounded-full border transition-all ${
-                c.enabled
-                  ? "border-transparent bg-gradient-to-br from-[#c2a566] to-[#8a6f3d] shadow-[0_1px_3px_rgba(33,28,22,0.3)]"
-                  : "border-line bg-transparent hover:border-gold"
-              }`}
-              title={c.enabled ? "Enabled" : "Disabled"}
-            />
-
-            <div className="w-40 shrink-0">
+          <div key={c.id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+            <div className="flex items-center gap-3 sm:w-44 sm:shrink-0">
+              <button
+                type="button"
+                onClick={() => update(c.id, { enabled: !c.enabled })}
+                disabled={disabled}
+                aria-pressed={c.enabled}
+                className={`h-[18px] w-[18px] shrink-0 rounded-full border transition-all ${
+                  c.enabled
+                    ? "border-transparent bg-gradient-to-br from-[#c2a566] to-[#8a6f3d] shadow-[0_1px_3px_rgba(33,28,22,0.3)]"
+                    : "border-line bg-transparent hover:border-gold"
+                }`}
+                title={c.enabled ? "Enabled" : "Disabled"}
+              />
               <span
-                className={`font-display text-lg ${c.enabled ? "text-ink" : "text-muted line-through"}`}
+                className={`flex-1 truncate font-display text-lg sm:flex-none ${
+                  c.enabled ? "text-ink" : "text-muted line-through"
+                }`}
               >
                 {c.name}
               </span>
-            </div>
-
-            <div className="flex-1">
-              <Slider
-                value={c.importance}
-                onChange={(v) => update(c.id, { importance: v, enabled: v > 0 ? c.enabled : c.enabled })}
-                disabled={disabled || !c.enabled}
-                ariaLabel={`${c.name} importance`}
-              />
-            </div>
-
-            <span
-              className={`label w-20 shrink-0 text-right !text-[0.625rem] ${
-                c.enabled ? "text-gold" : "text-line"
-              }`}
-            >
-              {c.enabled ? weightLabel(c.importance) : "—"}
-            </span>
-
-            {c.custom && (
-              <button
-                type="button"
-                onClick={() => remove(c.id)}
-                disabled={disabled}
-                className="shrink-0 text-muted transition-colors hover:text-ink"
-                title="Remove"
-                aria-label={`Remove ${c.name}`}
+              {/* weight label sits on the name line on mobile */}
+              <span
+                className={`label shrink-0 !text-[0.625rem] sm:hidden ${
+                  c.enabled ? "text-gold" : "text-line"
+                }`}
               >
-                ×
-              </button>
-            )}
+                {c.enabled ? weightLabel(c.importance) : "—"}
+              </span>
+              {c.custom && (
+                <button
+                  type="button"
+                  onClick={() => remove(c.id)}
+                  disabled={disabled}
+                  className="shrink-0 text-muted transition-colors hover:text-ink"
+                  title="Remove"
+                  aria-label={`Remove ${c.name}`}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 sm:flex-1">
+              <div className="flex-1">
+                <Slider
+                  value={c.importance}
+                  onChange={(v) => update(c.id, { importance: v })}
+                  disabled={disabled || !c.enabled}
+                  ariaLabel={`${c.name} importance`}
+                />
+              </div>
+              {/* weight label sits inline on larger screens */}
+              <span
+                className={`label hidden w-16 shrink-0 text-right !text-[0.625rem] sm:inline ${
+                  c.enabled ? "text-gold" : "text-line"
+                }`}
+              >
+                {c.enabled ? weightLabel(c.importance) : "—"}
+              </span>
+            </div>
           </div>
         ))}
       </div>
