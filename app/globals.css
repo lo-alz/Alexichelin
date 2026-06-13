@@ -6,6 +6,34 @@
   color-scheme: light;
 }
 
-body {
-  @apply bg-cream text-ink antialiased;
+@layer base {
+  body {
+    font-size: 1.0625rem;
+    line-height: 1.65;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display), Georgia, serif;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  ::selection {
+    background: #a8884e;
+    color: #fcfaf4;
+  }
+}
+
+@layer components {
+  /* Small-caps tracked label — the editorial workhorse. */
+  .label {
+    @apply text-xs uppercase tracking-label text-muted;
+  }
+
+  /* Thin warm hairline. */
+  .rule {
+    @apply border-0 border-t border-line;
+  }
 }

@@ -19,31 +19,54 @@ export default function SearchForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
-      <input
-        type="text"
-        value={restaurant}
-        onChange={(e) => setRestaurant(e.target.value)}
-        placeholder="Restaurant name (e.g. Carbone)"
-        className="flex-1 rounded-lg border border-stone-300 bg-white px-4 py-3 text-base outline-none focus:border-ink"
-        disabled={loading}
-        autoFocus
-      />
-      <input
-        type="text"
-        value={location}
-        onChange={(e) => setLocation(e.target.value)}
-        placeholder="City / area (optional)"
-        className="rounded-lg border border-stone-300 bg-white px-4 py-3 text-base outline-none focus:border-ink sm:w-56"
-        disabled={loading}
-      />
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6 sm:flex-row sm:items-end">
+      <Field label="Restaurant" className="flex-1">
+        <input
+          type="text"
+          value={restaurant}
+          onChange={(e) => setRestaurant(e.target.value)}
+          placeholder="Carbone"
+          className="w-full border-0 border-b border-line bg-transparent pb-2 text-2xl font-display text-ink outline-none transition-colors placeholder:italic placeholder:text-muted/60 focus:border-ink"
+          disabled={loading}
+          autoFocus
+        />
+      </Field>
+
+      <Field label="City / area" className="sm:w-64">
+        <input
+          type="text"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          placeholder="New York (optional)"
+          className="w-full border-0 border-b border-line bg-transparent pb-2 text-2xl font-display text-ink outline-none transition-colors placeholder:italic placeholder:text-muted/60 focus:border-ink"
+          disabled={loading}
+        />
+      </Field>
+
       <button
         type="submit"
         disabled={loading || !restaurant.trim()}
-        className="rounded-lg bg-ink px-6 py-3 font-medium text-cream transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-50"
+        className="label border border-ink px-7 py-3 text-ink transition-colors hover:bg-ink hover:text-paper disabled:cursor-not-allowed disabled:border-line disabled:text-muted disabled:hover:bg-transparent"
       >
-        {loading ? "Assessing…" : "Assess"}
+        {loading ? "Assessing" : "Assess"}
       </button>
     </form>
+  );
+}
+
+function Field({
+  label,
+  className = "",
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="label mb-3 block">{label}</span>
+      {children}
+    </label>
   );
 }

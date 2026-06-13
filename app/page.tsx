@@ -33,24 +33,32 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-5 py-10 sm:py-16">
-      <header className="mb-8">
-        <h1 className="font-serif text-4xl font-bold sm:text-5xl">Alexichelin</h1>
-        <p className="mt-2 max-w-2xl text-stone-600">
-          Type a restaurant. We assess its reputation across Reddit, Instagram, Google and
-          Michelin, then combine them into one score.
+    <main className="mx-auto max-w-4xl px-6 py-16 sm:py-24">
+      <header className="text-center">
+        <h1 className="font-display text-6xl font-semibold tracking-tight sm:text-7xl">
+          Alexichelin
+        </h1>
+        <div className="mx-auto mt-5 h-px w-16 bg-gold" />
+        <p className="mt-5 font-display text-xl italic text-muted">
+          Every review, one verdict.
+        </p>
+        <p className="mx-auto mt-3 max-w-xl text-ink/70">
+          A restaurant&apos;s standing across Reddit, Instagram, Google and the Michelin Guide —
+          considered, weighed, and distilled into a single score.
         </p>
       </header>
 
-      <SearchForm onSubmit={handleAssess} loading={loading} />
+      <div className="mt-14">
+        <SearchForm onSubmit={handleAssess} loading={loading} />
+      </div>
 
       {loading && <LoadingState />}
       {error && !loading && <ErrorState message={error} />}
       {result && !loading && <Results result={result} />}
       {!result && !loading && !error && <EmptyState />}
 
-      <footer className="mt-16 border-t border-stone-200 pt-6 text-sm text-stone-400">
-        Scores are AI-generated from public web sources and are estimates, not official ratings.
+      <footer className="mt-24 border-t border-line pt-6 text-center text-sm italic text-muted">
+        Scores are considered estimates drawn from public sources — a guide, not an official rating.
       </footer>
     </main>
   );
@@ -58,17 +66,20 @@ export default function Home() {
 
 function Results({ result }: { result: ScoreCard }) {
   return (
-    <section className="mt-10 space-y-8">
+    <section className="mt-16 space-y-12">
       <RestaurantHeader restaurant={result.restaurant} />
       <CombinedScore
         combinedScore={result.combinedScore}
         starRating={result.starRating}
         verdict={result.verdict}
       />
-      <div className="grid gap-4 sm:grid-cols-2">
-        {result.sources.map((s) => (
-          <SourceCard key={s.source} source={s} />
-        ))}
+      <div>
+        <p className="label mb-5 text-center">By Source</p>
+        <div className="grid gap-5 sm:grid-cols-2">
+          {result.sources.map((s) => (
+            <SourceCard key={s.source} source={s} />
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -76,11 +87,12 @@ function Results({ result }: { result: ScoreCard }) {
 
 function LoadingState() {
   return (
-    <div className="mt-10 rounded-2xl border border-stone-200 bg-white p-8 text-center">
-      <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-stone-300 border-t-ink" />
-      <p className="mt-4 font-medium">Researching the sources…</p>
-      <p className="mt-1 text-sm text-stone-500">
-        Searching Reddit, Instagram, Google and Michelin. This can take 20–40 seconds.
+    <div className="mt-20 text-center">
+      <p className="font-display text-2xl italic text-ink">Consulting the sources…</p>
+      <div className="mx-auto mt-5 h-px w-12 animate-pulse bg-gold" />
+      <p className="mt-4 text-sm text-muted">
+        Reading Reddit, Instagram, Google and the Michelin Guide. A moment, please — twenty to
+        forty seconds.
       </p>
     </div>
   );
@@ -88,18 +100,18 @@ function LoadingState() {
 
 function ErrorState({ message }: { message: string }) {
   return (
-    <div className="mt-10 rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800">
-      <p className="font-medium">Couldn&apos;t build the scorecard</p>
-      <p className="mt-1 text-sm">{message}</p>
+    <div className="mt-20 border-y border-line py-10 text-center">
+      <p className="font-display text-2xl italic text-ink">We couldn&apos;t reach a verdict</p>
+      <p className="mt-3 text-sm text-muted">{message}</p>
     </div>
   );
 }
 
 function EmptyState() {
   return (
-    <div className="mt-10 rounded-2xl border border-dashed border-stone-300 p-8 text-center text-stone-500">
-      <p>Search a restaurant above to see its combined scorecard.</p>
-      <p className="mt-1 text-sm">Tip: add a city if the name is common.</p>
+    <div className="mt-20 text-center text-muted">
+      <p className="font-display text-xl italic">Name a restaurant to begin.</p>
+      <p className="mt-2 text-sm">Add a city if the name is a common one.</p>
     </div>
   );
 }
