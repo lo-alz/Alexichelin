@@ -1,5 +1,5 @@
 {
-  "name": "alexichelin",
+  "name": "rosette",
   "version": "0.1.0",
   "private": true,
   "description": "Aggregate a restaurant's reviews across Reddit, Instagram, Google and Michelin into one combined score.",

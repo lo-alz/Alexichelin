@@ -18,7 +18,7 @@ const body = EB_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "Alexichelin — every review, one verdict",
+  title: "Rosette — every review, one verdict",
   description:
     "Type a restaurant and receive a single, considered verdict — its standing across Reddit, Instagram, Google and Michelin, distilled into one score.",
 };

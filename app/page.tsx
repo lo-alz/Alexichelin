@@ -36,7 +36,7 @@ export default function Home() {
     <main className="mx-auto max-w-4xl px-6 py-16 sm:py-24">
       <header className="text-center">
         <h1 className="font-display text-6xl font-semibold tracking-tight sm:text-7xl">
-          Alexichelin
+          Rosette
         </h1>
         <div className="mx-auto mt-5 h-px w-16 bg-gold" />
         <p className="mt-5 font-display text-xl italic text-muted">

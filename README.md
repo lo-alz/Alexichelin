@@ -1,4 +1,4 @@
-# Alexichelin
+# Rosette
 
 Type a restaurant, get a one-pager that combines its reputation across
 **Reddit, Instagram, Google and Michelin** into a single score.

@@ -34,8 +34,8 @@ export async function callOpenRouter(body: Record<string, unknown>): Promise<Ope
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
       // Optional attribution headers OpenRouter uses for its dashboard.
-      "HTTP-Referer": "https://alexichelin.vercel.app",
-      "X-Title": "Alexichelin",
+      "HTTP-Referer": "https://alexichelin-b777.vercel.app",
+      "X-Title": "Rosette",
     },
     body: JSON.stringify(body),
   });
