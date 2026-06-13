@@ -2,30 +2,23 @@
 
 import { useState } from "react";
 import type { SourceScore } from "@/lib/schema";
-import { sourceUrl } from "@/lib/sourceLinks";
+import { parseMichelin } from "@/lib/michelin";
+import MichelinMark from "./MichelinMark";
 import StarRating from "./StarRating";
 
 const CONFIDENCE_DOTS = { high: 3, medium: 2, low: 1 } as const;
 
 /**
- * A source's grade. Condensed by default (name + score + confidence); tap to
- * expand the summary, highlights and citations. Mobile-first.
+ * A source's grade. Condensed header (name + score + confidence); tap to expand
+ * the summary, highlights and citations. Michelin is special-cased: it leads
+ * with its native distinction (Stars / Bib / Plate) and shows the 0–5 Rosette
+ * translation only as a small secondary value.
  */
-export default function SourceCard({
-  source,
-  restaurant,
-  location,
-}: {
-  source: SourceScore;
-  restaurant: string;
-  location: string;
-}) {
-  // Expanded by default so the summary/reviews are visible; tap to collapse.
+export default function SourceCard({ source }: { source: SourceScore }) {
   const [open, setOpen] = useState(true);
   const hasScore = source.score !== null;
-  const hasDetail =
-    !!source.summary || source.highlights.length > 0 || source.citations.length > 0;
-  const link = sourceUrl(source, restaurant, location);
+  const isMichelin = /michelin/i.test(source.source);
+  const michelin = isMichelin ? parseMichelin(source.nativeRating, source.summary) : null;
 
   return (
     <div className="border border-line bg-card">
@@ -39,14 +32,23 @@ export default function SourceCard({
           <h3 className="label !text-ink !text-sm">{source.source}</h3>
           <div className="mt-1.5 flex items-center gap-3">
             <ConfidenceDots level={source.confidence} />
-            {hasScore && source.nativeRating && (
-              <span className="truncate text-xs italic text-muted">{source.nativeRating}</span>
-            )}
+            {isMichelin
+              ? hasScore && (
+                  <span className="text-xs italic text-muted">
+                    Rosette {source.score!.toFixed(1)} / 5
+                  </span>
+                )
+              : hasScore &&
+                source.nativeRating && (
+                  <span className="truncate text-xs italic text-muted">{source.nativeRating}</span>
+                )}
           </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
-          {hasScore ? (
+          {isMichelin && michelin ? (
+            <MichelinMark d={michelin} />
+          ) : hasScore ? (
             <span className="font-display text-3xl font-semibold leading-none text-gold">
               {source.score!.toFixed(1)}
             </span>
@@ -64,11 +66,18 @@ export default function SourceCard({
 
       {open && (
         <div className="border-t border-line px-5 pb-5 pt-4">
-          {hasScore && (
+          {hasScore && !isMichelin && (
             <div className="mb-3">
               <StarRating value={source.score!} size="sm" />
             </div>
           )}
+          {isMichelin && (
+            <p className="mb-3 text-xs italic text-muted">
+              Michelin uses its own scale (shown above). For comparison it maps to{" "}
+              {hasScore ? `${source.score!.toFixed(1)} / 5` : "—"} on the Rosette scale.
+            </p>
+          )}
+
           {source.summary && <p className="leading-relaxed text-ink/85">{source.summary}</p>}
 
           {source.highlights.length > 0 && (
@@ -102,17 +111,6 @@ export default function SourceCard({
               </ul>
             </div>
           )}
-
-          <div className="mt-5 border-t border-line pt-4">
-            <a
-              href={link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="label inline-flex items-center gap-1.5 text-gold transition-colors hover:text-goldDark"
-            >
-              View on {source.source} ↗
-            </a>
-          </div>
         </div>
       )}
     </div>
