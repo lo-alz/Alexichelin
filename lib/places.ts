@@ -1,10 +1,11 @@
 /**
  * Google Places lookup for authoritative Google Maps data (rating + review
- * count + price level). Uses the Places API (New) Text Search endpoint. Reads
- * GOOGLE_PLACES_API_KEY; returns null when the key is missing or nothing is
- * found, so the caller can fall back to web search.
+ * count + price level + photos + maps link). Uses the Places API (New) Text
+ * Search endpoint. Reads GOOGLE_PLACES_API_KEY; returns null when the key is
+ * missing or nothing is found, so the caller can fall back to web search.
  */
 const SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
+const MAX_PHOTOS = 6;
 
 export interface GooglePlace {
   name: string;
@@ -14,6 +15,8 @@ export interface GooglePlace {
   /** Google price level 1–4, if known. */
   priceLevel: number | null;
   mapsUri: string | null;
+  /** Public image URLs (lh3.googleusercontent.com) for a carousel. */
+  photos: string[];
 }
 
 const PRICE_LEVEL_MAP: Record<string, number> = {
@@ -22,6 +25,26 @@ const PRICE_LEVEL_MAP: Record<string, number> = {
   PRICE_LEVEL_EXPENSIVE: 3,
   PRICE_LEVEL_VERY_EXPENSIVE: 4,
 };
+
+/** Resolve photo resource names to public image URLs (no API key in the URL). */
+async function resolvePhotos(photoNames: string[], key: string): Promise<string[]> {
+  const results = await Promise.all(
+    photoNames.slice(0, MAX_PHOTOS).map(async (name) => {
+      try {
+        const res = await fetch(
+          `https://places.googleapis.com/v1/${name}/media?maxWidthPx=1200&skipHttpRedirect=true`,
+          { headers: { "X-Goog-Api-Key": key } },
+        );
+        if (!res.ok) return null;
+        const data = (await res.json()) as { photoUri?: string };
+        return data.photoUri ?? null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return results.filter((u): u is string => !!u);
+}
 
 export async function getGooglePlace(
   restaurant: string,
@@ -39,7 +62,7 @@ export async function getGooglePlace(
         "Content-Type": "application/json",
         "X-Goog-Api-Key": key,
         "X-Goog-FieldMask":
-          "places.displayName,places.rating,places.userRatingCount,places.priceLevel,places.googleMapsUri",
+          "places.displayName,places.rating,places.userRatingCount,places.priceLevel,places.googleMapsUri,places.photos",
       },
       body: JSON.stringify({ textQuery, maxResultCount: 1 }),
     });
@@ -52,10 +75,14 @@ export async function getGooglePlace(
         userRatingCount?: number;
         priceLevel?: string;
         googleMapsUri?: string;
+        photos?: { name?: string }[];
       }[];
     };
     const p = data.places?.[0];
     if (!p || typeof p.rating !== "number") return null;
+
+    const photoNames = (p.photos ?? []).map((ph) => ph.name).filter((n): n is string => !!n);
+    const photos = photoNames.length ? await resolvePhotos(photoNames, key) : [];
 
     return {
       name: p.displayName?.text ?? restaurant,
@@ -63,6 +90,7 @@ export async function getGooglePlace(
       reviewCount: p.userRatingCount ?? 0,
       priceLevel: p.priceLevel ? PRICE_LEVEL_MAP[p.priceLevel] ?? null : null,
       mapsUri: p.googleMapsUri ?? null,
+      photos,
     };
   } catch {
     return null;

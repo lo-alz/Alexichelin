@@ -78,6 +78,10 @@ export const restaurantSchema = z.object({
   menuUrl: z.string().nullable().catch(null),
   /** Reservation/booking link (OpenTable, Resy, Tock, or the venue's own), or null. */
   bookingUrl: z.string().nullable().catch(null),
+  /** Google Maps link (populated server-side from Places). */
+  mapsUrl: z.string().nullable().catch(null),
+  /** Photo URLs for the carousel (populated server-side from Places). */
+  images: z.array(z.string()).catch([]),
   summary: z.string().catch(""),
 });
 export type Restaurant = z.infer<typeof restaurantSchema>;

@@ -178,7 +178,7 @@ function sanitizeScorecard(raw: unknown, requested: string[]): unknown {
 }
 
 /** Overwrite the Google source with authoritative Places data when we have it. */
-function applyGooglePlace(card: ScoreCard, place: GooglePlace): ScoreCard {
+function applyGoogleSource(card: ScoreCard, place: GooglePlace): void {
   const nativeRating = `${place.rating}/5 (${place.reviewCount.toLocaleString()} reviews)`;
   const existing = card.sources.find((s) => /google/i.test(s.source));
   if (existing) {
@@ -199,8 +199,6 @@ function applyGooglePlace(card: ScoreCard, place: GooglePlace): ScoreCard {
       citations: place.mapsUri ? [{ title: "Google Maps", url: place.mapsUri }] : [],
     });
   }
-  if (place.priceLevel) card.restaurant.priceLevel = place.priceLevel;
-  return card;
 }
 
 /**
@@ -216,9 +214,10 @@ export async function assessRestaurant(
   sources: string[] = [...SOURCES],
 ): Promise<ScoreCard> {
   const sourceList = sources.length > 0 ? sources : [...SOURCES];
-  // Authoritative Google data only when a Google-ish source is requested.
   const wantsGoogle = sourceList.some((s) => /google/i.test(s));
-  const place = wantsGoogle ? await getGooglePlace(restaurant, location) : null;
+  // Always fetch Places (when configured) for photos + maps link + price; the
+  // Google *score* override is applied only when a Google source is requested.
+  const place = await getGooglePlace(restaurant, location);
 
   const data = await callOpenRouter({
     model: MODEL,
@@ -250,7 +249,13 @@ export async function assessRestaurant(
     throw new Error(`Model returned a malformed scorecard: ${parsed.error.message}`);
   }
 
-  const card = place ? applyGooglePlace(parsed.data, place) : parsed.data;
+  const card = parsed.data;
+  if (place) {
+    card.restaurant.images = place.photos;
+    card.restaurant.mapsUrl = place.mapsUri;
+    if (place.priceLevel) card.restaurant.priceLevel = place.priceLevel;
+    if (wantsGoogle) applyGoogleSource(card, place);
+  }
 
   // Compute the source consensus ourselves rather than trusting the model's
   // (often flaky) numbers — confidence-weighted, equal user weight.

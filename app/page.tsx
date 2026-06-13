@@ -1,20 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_CRITERIA, SOURCES, type ScoreCard } from "@/lib/schema";
 import { personalizedScore, roundToHalf, weightedSourceScore } from "@/lib/scoring";
 import SearchForm from "@/components/SearchForm";
 import CriteriaControls, { type CriterionPref } from "@/components/CriteriaControls";
 import CriteriaBreakdown from "@/components/CriteriaBreakdown";
 import SourceControls, { type SourcePref } from "@/components/SourceControls";
-import SourceWeightControls from "@/components/SourceWeightControls";
 import RestaurantHeader from "@/components/RestaurantHeader";
+import ImageCarousel from "@/components/ImageCarousel";
 import CombinedScore from "@/components/CombinedScore";
 import SourceCard from "@/components/SourceCard";
 
 const PREFS_KEY = "rosette.criteria";
-const WEIGHTS_KEY = "rosette.weights";
-const SOURCES_KEY = "rosette.sources";
+const SOURCES_KEY = "rosette.sources.v2";
 
 function defaultPrefs(): CriterionPref[] {
   return DEFAULT_CRITERIA.map((name, i) => ({
@@ -26,11 +25,7 @@ function defaultPrefs(): CriterionPref[] {
 }
 
 function defaultSourcePrefs(): SourcePref[] {
-  return SOURCES.map((name, i) => ({ id: `src-default-${i}`, name, enabled: true }));
-}
-
-function defaultWeights(): Record<string, number> {
-  return Object.fromEntries(SOURCES.map((s) => [s, 50]));
+  return SOURCES.map((name, i) => ({ id: `src-default-${i}`, name, enabled: true, weight: 50 }));
 }
 
 export default function Home() {
@@ -39,7 +34,7 @@ export default function Home() {
   const [result, setResult] = useState<ScoreCard | null>(null);
   const [prefs, setPrefs] = useState<CriterionPref[]>(defaultPrefs);
   const [sourcePrefs, setSourcePrefs] = useState<SourcePref[]>(defaultSourcePrefs);
-  const [weights, setWeights] = useState<Record<string, number>>(defaultWeights);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   // Restore saved preferences once on mount.
   useEffect(() => {
@@ -48,8 +43,6 @@ export default function Home() {
       if (p) setPrefs(JSON.parse(p));
       const s = localStorage.getItem(SOURCES_KEY);
       if (s) setSourcePrefs(JSON.parse(s));
-      const w = localStorage.getItem(WEIGHTS_KEY);
-      if (w) setWeights({ ...defaultWeights(), ...JSON.parse(w) });
     } catch {
       /* ignore malformed storage */
     }
@@ -69,17 +62,21 @@ export default function Home() {
       /* ignore */
     }
   }, [sourcePrefs]);
+
+  // Slide to the result once it arrives.
   useEffect(() => {
-    try {
-      localStorage.setItem(WEIGHTS_KEY, JSON.stringify(weights));
-    } catch {
-      /* ignore */
+    if (result && resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [weights]);
+  }, [result]);
 
   const importances = useMemo(
     () => Object.fromEntries(prefs.map((p) => [p.name, p.importance])),
     [prefs],
+  );
+  const weights = useMemo(
+    () => Object.fromEntries(sourcePrefs.map((s) => [s.name, s.weight])),
+    [sourcePrefs],
   );
 
   const personalized = useMemo(
@@ -118,42 +115,44 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-6 py-16 sm:py-24">
+    <main className="mx-auto max-w-3xl px-5 py-12 sm:px-6 sm:py-20">
       <header className="text-center">
-        <h1 className="font-display text-6xl font-semibold tracking-tight sm:text-7xl">Rosette</h1>
-        <div className="mx-auto mt-5 h-px w-16 bg-gold" />
-        <p className="mt-5 font-display text-xl italic text-muted">Every review, one verdict.</p>
-        <p className="mx-auto mt-3 max-w-xl text-ink/70">
-          A restaurant&apos;s standing across Reddit, Instagram, Google and the Michelin Guide —
-          graded against what <em>you</em> care about, and distilled into one personalized score.
+        <h1 className="font-display text-5xl font-semibold tracking-tight sm:text-7xl">Rosette</h1>
+        <div className="mx-auto mt-4 h-px w-16 bg-gold" />
+        <p className="mt-4 font-display text-lg italic text-muted sm:text-xl">
+          Every review, one verdict.
+        </p>
+        <p className="mx-auto mt-3 max-w-xl text-sm text-ink/70 sm:text-base">
+          A restaurant&apos;s standing across your chosen sources — graded against what{" "}
+          <em>you</em> care about, distilled into one personalized score.
         </p>
       </header>
 
-      <div className="mt-14">
+      <div className="mt-10">
         <SearchForm onSubmit={handleAssess} loading={loading} />
       </div>
 
-      <div className="mt-8 space-y-6">
+      <div className="mt-7 space-y-5">
         <CriteriaControls criteria={prefs} onChange={setPrefs} disabled={loading} />
         <SourceControls sources={sourcePrefs} onChange={setSourcePrefs} disabled={loading} />
       </div>
 
-      {loading && <LoadingState />}
-      {error && !loading && <ErrorState message={error} />}
-      {result && !loading && (
-        <Results
-          result={result}
-          personalized={personalized}
-          consensus={consensus}
-          importances={importances}
-          onImportance={setImportance}
-          weights={weights}
-          onWeights={setWeights}
-        />
-      )}
-      {!result && !loading && !error && <EmptyState />}
+      <div ref={resultsRef} className="scroll-mt-6">
+        {loading && <LoadingState />}
+        {error && !loading && <ErrorState message={error} />}
+        {result && !loading && (
+          <Results
+            result={result}
+            personalized={personalized}
+            consensus={consensus}
+            importances={importances}
+            onImportance={setImportance}
+          />
+        )}
+        {!result && !loading && !error && <EmptyState />}
+      </div>
 
-      <footer className="mt-24 border-t border-line pt-6 text-center text-sm italic text-muted">
+      <footer className="mt-20 border-t border-line pt-6 text-center text-xs italic text-muted sm:text-sm">
         Scores are considered estimates drawn from public sources — a guide, not an official rating.
       </footer>
     </main>
@@ -166,16 +165,12 @@ function Results({
   consensus,
   importances,
   onImportance,
-  weights,
-  onWeights,
 }: {
   result: ScoreCard;
   personalized: number | null;
   consensus: number | null;
   importances: Record<string, number>;
   onImportance: (name: string, value: number) => void;
-  weights: Record<string, number>;
-  onWeights: (next: Record<string, number>) => void;
 }) {
   const hero =
     personalized !== null
@@ -183,8 +178,12 @@ function Results({
       : { label: "Combined Score", score: result.combinedScore, subtitle: undefined };
 
   return (
-    <section className="mt-16 space-y-12">
+    <section className="mt-12 space-y-10">
       <RestaurantHeader restaurant={result.restaurant} />
+
+      {result.restaurant.images.length > 0 && (
+        <ImageCarousel images={result.restaurant.images} alt={result.restaurant.name} />
+      )}
 
       <CombinedScore
         label={hero.label}
@@ -205,18 +204,11 @@ function Results({
       <div>
         <p className="label mb-1 text-center">By Source</p>
         {consensus !== null && (
-          <p className="mb-6 text-center font-display text-lg italic text-muted">
+          <p className="mb-5 text-center font-display text-base italic text-muted">
             Weighted consensus {consensus.toFixed(1)} / 5
           </p>
         )}
-        <div className="mb-6">
-          <SourceWeightControls
-            sources={result.sources.map((s) => s.source)}
-            weights={weights}
-            onChange={onWeights}
-          />
-        </div>
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           {result.sources.map((s) => (
             <SourceCard key={s.source} source={s} />
           ))}
@@ -228,12 +220,12 @@ function Results({
 
 function LoadingState() {
   return (
-    <div className="mt-20 text-center">
+    <div className="mt-16 text-center">
       <p className="font-display text-2xl italic text-ink">Consulting the sources…</p>
       <div className="mx-auto mt-5 h-px w-12 animate-pulse bg-gold" />
       <p className="mt-4 text-sm text-muted">
-        Reading Reddit, Instagram, Google and the Michelin Guide, and grading your criteria. A
-        moment, please — twenty to forty seconds.
+        Reading your chosen sources and grading your criteria. A moment, please — twenty to forty
+        seconds.
       </p>
     </div>
   );
@@ -241,7 +233,7 @@ function LoadingState() {
 
 function ErrorState({ message }: { message: string }) {
   return (
-    <div className="mt-20 border-y border-line py-10 text-center">
+    <div className="mt-16 border-y border-line py-10 text-center">
       <p className="font-display text-2xl italic text-ink">We couldn&apos;t reach a verdict</p>
       <p className="mt-3 text-sm text-muted">{message}</p>
     </div>
@@ -250,7 +242,7 @@ function ErrorState({ message }: { message: string }) {
 
 function EmptyState() {
   return (
-    <div className="mt-20 text-center text-muted">
+    <div className="mt-16 text-center text-muted">
       <p className="font-display text-xl italic">Name a restaurant to begin.</p>
       <p className="mt-2 text-sm">Add a city if the name is a common one.</p>
     </div>

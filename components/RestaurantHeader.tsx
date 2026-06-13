@@ -6,7 +6,18 @@ export default function RestaurantHeader({ restaurant }: { restaurant: Restauran
       <h2 className="font-display text-5xl font-semibold leading-tight sm:text-6xl">
         {restaurant.name}
       </h2>
-      <p className="mt-2 font-display text-xl italic text-muted">{restaurant.location}</p>
+      {restaurant.mapsUrl ? (
+        <a
+          href={restaurant.mapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 inline-block font-display text-xl italic text-muted underline decoration-line underline-offset-4 transition-colors hover:text-gold hover:decoration-gold"
+        >
+          {restaurant.location} ↗
+        </a>
+      ) : (
+        <p className="mt-2 font-display text-xl italic text-muted">{restaurant.location}</p>
+      )}
 
       <div className="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
         <Meta label="Cuisine" value={restaurant.cuisine} />

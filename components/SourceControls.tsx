@@ -2,15 +2,21 @@
 
 import { useState } from "react";
 import { SUGGESTED_SOURCES } from "@/lib/schema";
+import Slider, { weightLabel } from "./Slider";
 
 export interface SourcePref {
   id: string;
   name: string;
   enabled: boolean;
+  /** 0–100 weight toward the source consensus. */
+  weight: number;
   custom?: boolean;
 }
 
-/** "Sources" — choose which review platforms to aggregate. */
+/**
+ * "Sources" — choose which platforms to aggregate and how much each counts.
+ * Set up front (before assessing); the weights drive the consensus on results.
+ */
 export default function SourceControls({
   sources,
   onChange,
@@ -24,14 +30,13 @@ export default function SourceControls({
   const present = new Set(sources.map((s) => s.name.toLowerCase()));
   const suggestions = SUGGESTED_SOURCES.filter((s) => !present.has(s.toLowerCase()));
 
-  function toggle(id: string) {
-    onChange(sources.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s)));
+  function update(id: string, patch: Partial<SourcePref>) {
+    onChange(sources.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
   function remove(id: string) {
     onChange(sources.filter((s) => s.id !== id));
   }
   function add(name: string, custom = false) {
-    // Split on commas so several sources can be added at once.
     const names = name
       .split(",")
       .map((s) => s.trim())
@@ -41,66 +46,82 @@ export default function SourceControls({
     names.forEach((n, i) => {
       if (seen.has(n.toLowerCase())) return;
       seen.add(n.toLowerCase());
-      additions.push({ id: `src-${Date.now()}-${i}`, name: n, enabled: true, custom });
+      additions.push({ id: `src-${Date.now()}-${i}`, name: n, enabled: true, weight: 50, custom });
     });
     if (additions.length) onChange([...sources, ...additions]);
   }
 
   return (
-    <section className="border border-line bg-card p-7">
-      <p className="label">Sources</p>
+    <section className="border border-line bg-card p-6 sm:p-7">
+      <p className="label">Sources &amp; trust</p>
       <p className="mt-2 text-sm italic text-muted">
-        Choose which platforms to aggregate. Tap to toggle.
+        Choose which platforms to aggregate and how much each one counts.
       </p>
 
-      <div className="mt-5 flex flex-wrap gap-2.5">
+      <div className="mt-5 space-y-3.5">
         {sources.map((s) => (
-          <span key={s.id} className="inline-flex items-center">
+          <div key={s.id} className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => toggle(s.id)}
+              onClick={() => update(s.id, { enabled: !s.enabled })}
               disabled={disabled}
               aria-pressed={s.enabled}
-              className={`label !text-[0.7rem] border px-3.5 py-2 transition-colors ${
-                s.enabled
-                  ? "border-gold bg-gold/10 text-ink"
-                  : "border-line text-muted hover:border-ink"
+              className={`h-4 w-4 shrink-0 rounded-full border transition-colors ${
+                s.enabled ? "border-gold bg-gold" : "border-line bg-transparent"
+              }`}
+              title={s.enabled ? "Enabled" : "Disabled"}
+            />
+            <span
+              className={`w-24 shrink-0 font-display text-lg ${
+                s.enabled ? "text-ink" : "text-muted line-through"
               }`}
             >
               {s.name}
-            </button>
+            </span>
+            <div className="flex-1">
+              <Slider
+                value={s.weight}
+                onChange={(v) => update(s.id, { weight: v })}
+                disabled={disabled || !s.enabled}
+                ariaLabel={`${s.name} weight`}
+              />
+            </div>
+            <span
+              className={`label w-16 shrink-0 text-right !text-[0.625rem] ${
+                s.enabled ? "text-gold" : "text-line"
+              }`}
+            >
+              {s.enabled ? weightLabel(s.weight) : "—"}
+            </span>
             {s.custom && (
               <button
                 type="button"
                 onClick={() => remove(s.id)}
                 disabled={disabled}
-                className="ml-1 text-muted transition-colors hover:text-ink"
+                className="shrink-0 text-muted transition-colors hover:text-ink"
                 aria-label={`Remove ${s.name}`}
                 title="Remove"
               >
                 ×
               </button>
             )}
-          </span>
+          </div>
         ))}
       </div>
 
       {suggestions.length > 0 && (
-        <div className="mt-5">
-          <p className="label !text-[0.625rem] text-muted">Add a source</p>
-          <div className="mt-2.5 flex flex-wrap gap-2.5">
-            {suggestions.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => add(s)}
-                disabled={disabled}
-                className="border border-dashed border-line px-3.5 py-2 text-sm italic text-muted transition-colors hover:border-gold hover:text-ink"
-              >
-                + {s}
-              </button>
-            ))}
-          </div>
+        <div className="mt-5 flex flex-wrap gap-2.5">
+          {suggestions.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => add(s)}
+              disabled={disabled}
+              className="border border-dashed border-line px-3 py-1.5 text-sm italic text-muted transition-colors hover:border-gold hover:text-ink"
+            >
+              + {s}
+            </button>
+          ))}
         </div>
       )}
 
