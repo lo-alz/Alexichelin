@@ -15,7 +15,8 @@ export const citationSchema = z.object({
 export const sourceScoreSchema = z.object({
   source: z.enum(SOURCES),
   /** Normalized 0–5 score, or null when no meaningful signal was found. */
-  score: z.number().min(0).max(5).nullable(),
+  // Smaller models sometimes emit numbers as strings — coerce, but keep null as null.
+  score: z.union([z.null(), z.coerce.number().min(0).max(5)]),
   /** Native rating as found, e.g. "4.5/5 (1,203 reviews)", "1 Star", or null. */
   nativeRating: z.string().nullable(),
   confidence: z.enum(["high", "medium", "low"]),
@@ -32,7 +33,7 @@ export const restaurantSchema = z.object({
   /** Human-readable price range, e.g. "$$$ · ~$120pp". */
   priceRange: z.string(),
   /** 1 (cheap) – 4 (very expensive). */
-  priceLevel: z.number().int().min(1).max(4),
+  priceLevel: z.coerce.number().int().min(1).max(4),
   menuUrl: z.string().nullable(),
   summary: z.string(),
 });
@@ -42,9 +43,9 @@ export const scoreCardSchema = z.object({
   restaurant: restaurantSchema,
   sources: z.array(sourceScoreSchema),
   /** Confidence-weighted average of the per-source scores, 0–5. */
-  combinedScore: z.number().min(0).max(5),
+  combinedScore: z.coerce.number().min(0).max(5),
   /** Rounded combined score for the star row, 0–5. */
-  starRating: z.number().min(0).max(5),
+  starRating: z.coerce.number().min(0).max(5),
   verdict: z.string(),
 });
 export type ScoreCard = z.infer<typeof scoreCardSchema>;
