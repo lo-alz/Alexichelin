@@ -73,8 +73,10 @@ export default function CriteriaControls({
               onClick={() => update(c.id, { enabled: !c.enabled })}
               disabled={disabled}
               aria-pressed={c.enabled}
-              className={`h-4 w-4 shrink-0 rounded-full border transition-colors ${
-                c.enabled ? "border-gold bg-gold" : "border-line bg-transparent"
+              className={`h-[18px] w-[18px] shrink-0 rounded-full border transition-all ${
+                c.enabled
+                  ? "border-transparent bg-gradient-to-br from-[#c2a566] to-[#8a6f3d] shadow-[0_1px_3px_rgba(33,28,22,0.3)]"
+                  : "border-line bg-transparent hover:border-gold"
               }`}
               title={c.enabled ? "Enabled" : "Disabled"}
             />

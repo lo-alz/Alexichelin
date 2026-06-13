@@ -9,7 +9,11 @@ export function weightLabel(n: number): string {
   return "Essential";
 }
 
-/** A slim gold range slider used for both criteria importance and source weights. */
+/**
+ * Gold range slider used for criteria importance and source weights. The track
+ * shows a gold fill up to the value over a warm unfilled groove (custom thumb
+ * + track styled in globals.css under `.rosette-slider`).
+ */
 export default function Slider({
   value,
   onChange,
@@ -21,6 +25,10 @@ export default function Slider({
   disabled?: boolean;
   ariaLabel: string;
 }) {
+  const pct = Math.max(0, Math.min(100, value));
+  const groove = disabled ? "#E3DCCE" : "#CBBFA6";
+  const fillColor = disabled ? "#C8BD9E" : "#A8884E";
+
   return (
     <input
       type="range"
@@ -31,8 +39,10 @@ export default function Slider({
       onChange={(e) => onChange(Number(e.target.value))}
       disabled={disabled}
       aria-label={ariaLabel}
-      style={{ accentColor: "#A8884E" }}
-      className="h-1 w-full cursor-pointer appearance-none rounded-full bg-line disabled:cursor-not-allowed disabled:opacity-50"
+      className="rosette-slider w-full"
+      style={{
+        background: `linear-gradient(to right, ${fillColor} 0%, ${fillColor} ${pct}%, ${groove} ${pct}%, ${groove} 100%)`,
+      }}
     />
   );
 }

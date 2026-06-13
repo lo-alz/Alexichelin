@@ -66,8 +66,10 @@ export default function SourceControls({
               onClick={() => update(s.id, { enabled: !s.enabled })}
               disabled={disabled}
               aria-pressed={s.enabled}
-              className={`h-4 w-4 shrink-0 rounded-full border transition-colors ${
-                s.enabled ? "border-gold bg-gold" : "border-line bg-transparent"
+              className={`h-[18px] w-[18px] shrink-0 rounded-full border transition-all ${
+                s.enabled
+                  ? "border-transparent bg-gradient-to-br from-[#c2a566] to-[#8a6f3d] shadow-[0_1px_3px_rgba(33,28,22,0.3)]"
+                  : "border-line bg-transparent hover:border-gold"
               }`}
               title={s.enabled ? "Enabled" : "Disabled"}
             />
