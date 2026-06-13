@@ -46,6 +46,66 @@ async function resolvePhotos(photoNames: string[], key: string): Promise<string[
   return results.filter((u): u is string => !!u);
 }
 
+export interface PlaceSuggestion {
+  /** Restaurant display name. */
+  name: string;
+  /** Best-guess city (locality), e.g. "Vancouver". */
+  city: string;
+  /** Full formatted address, shown as secondary text. */
+  area: string;
+}
+
+interface AddressComponent {
+  longText?: string;
+  types?: string[];
+}
+
+function pickCity(components: AddressComponent[]): string {
+  const byType = (t: string) => components.find((c) => (c.types ?? []).includes(t))?.longText;
+  return (
+    byType("locality") ||
+    byType("postal_town") ||
+    byType("administrative_area_level_2") ||
+    byType("administrative_area_level_1") ||
+    ""
+  );
+}
+
+/** Restaurant typeahead suggestions with a resolved city for each. */
+export async function getSuggestions(query: string): Promise<PlaceSuggestion[]> {
+  const key = process.env.GOOGLE_PLACES_API_KEY;
+  if (!key || query.trim().length < 3) return [];
+  try {
+    const res = await fetch(SEARCH_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": key,
+        "X-Goog-FieldMask":
+          "places.displayName,places.formattedAddress,places.addressComponents",
+      },
+      body: JSON.stringify({ textQuery: query.trim(), maxResultCount: 5, includedType: "restaurant" }),
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as {
+      places?: {
+        displayName?: { text?: string };
+        formattedAddress?: string;
+        addressComponents?: AddressComponent[];
+      }[];
+    };
+    return (data.places ?? [])
+      .map((p) => ({
+        name: p.displayName?.text ?? "",
+        city: pickCity(p.addressComponents ?? []),
+        area: p.formattedAddress ?? "",
+      }))
+      .filter((s) => s.name);
+  } catch {
+    return [];
+  }
+}
+
 export async function getGooglePlace(
   restaurant: string,
   location?: string,
