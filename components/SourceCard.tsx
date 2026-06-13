@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { SourceScore } from "@/lib/schema";
+import { sourceUrl } from "@/lib/sourceLinks";
 import StarRating from "./StarRating";
 
 const CONFIDENCE_DOTS = { high: 3, medium: 2, low: 1 } as const;
@@ -10,18 +11,27 @@ const CONFIDENCE_DOTS = { high: 3, medium: 2, low: 1 } as const;
  * A source's grade. Condensed by default (name + score + confidence); tap to
  * expand the summary, highlights and citations. Mobile-first.
  */
-export default function SourceCard({ source }: { source: SourceScore }) {
+export default function SourceCard({
+  source,
+  restaurant,
+  location,
+}: {
+  source: SourceScore;
+  restaurant: string;
+  location: string;
+}) {
   // Expanded by default so the summary/reviews are visible; tap to collapse.
   const [open, setOpen] = useState(true);
   const hasScore = source.score !== null;
   const hasDetail =
     !!source.summary || source.highlights.length > 0 || source.citations.length > 0;
+  const link = sourceUrl(source, restaurant, location);
 
   return (
     <div className="border border-line bg-card">
       <button
         type="button"
-        onClick={() => hasDetail && setOpen((o) => !o)}
+        onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
       >
@@ -43,18 +53,16 @@ export default function SourceCard({ source }: { source: SourceScore }) {
           ) : (
             <span className="font-display text-2xl leading-none text-line">—</span>
           )}
-          {hasDetail && (
-            <span
-              className={`text-muted transition-transform ${open ? "rotate-180" : ""}`}
-              aria-hidden
-            >
-              ⌄
-            </span>
-          )}
+          <span
+            className={`text-muted transition-transform ${open ? "rotate-180" : ""}`}
+            aria-hidden
+          >
+            ⌄
+          </span>
         </div>
       </button>
 
-      {open && hasDetail && (
+      {open && (
         <div className="border-t border-line px-5 pb-5 pt-4">
           {hasScore && (
             <div className="mb-3">
@@ -94,6 +102,17 @@ export default function SourceCard({ source }: { source: SourceScore }) {
               </ul>
             </div>
           )}
+
+          <div className="mt-5 border-t border-line pt-4">
+            <a
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="label inline-flex items-center gap-1.5 text-gold transition-colors hover:text-goldDark"
+            >
+              View on {source.source} ↗
+            </a>
+          </div>
         </div>
       )}
     </div>

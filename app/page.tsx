@@ -210,7 +210,12 @@ function Results({
         )}
         <div className="grid gap-4 sm:grid-cols-2">
           {result.sources.map((s) => (
-            <SourceCard key={s.source} source={s} />
+            <SourceCard
+              key={s.source}
+              source={s}
+              restaurant={result.restaurant.name}
+              location={result.restaurant.location}
+            />
           ))}
         </div>
       </div>
