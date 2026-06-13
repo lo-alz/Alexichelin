@@ -70,23 +70,62 @@ function userPrompt(
 }
 
 /**
- * Parse the tool-call arguments into JSON, tolerating the ways smaller models
- * mangle it: markdown ```json fences, leading/trailing prose, or text wrapped
- * around the object. Throws with a diagnostic snippet if it still can't parse.
+ * Best-effort recovery of the JSON object from messy model output. Smaller
+ * models (Haiku) sometimes leak tool-wrapper tags like `</parameter></invoke>`
+ * where the closing braces should be. We cut at the first such tag, then walk
+ * the object tracking string state and auto-close any braces/brackets left open
+ * by truncation — which recovers an otherwise-complete scorecard.
+ */
+function salvageJson(input: string): string | null {
+  let s = input;
+  const tag = s.search(/<\/?(?:parameter|invoke|function|tool|antml)\b/i);
+  if (tag >= 0) s = s.slice(0, tag);
+  const start = s.indexOf("{");
+  if (start < 0) return null;
+
+  const stack: string[] = [];
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < s.length; i++) {
+    const ch = s[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === "{") stack.push("}");
+    else if (ch === "[") stack.push("]");
+    else if (ch === "}" || ch === "]") {
+      stack.pop();
+      if (stack.length === 0) return s.slice(start, i + 1);
+    }
+  }
+  // Truncated mid-object: close the open string (if any), drop a dangling
+  // comma/partial key, and close every still-open brace/bracket.
+  let out = s.slice(start);
+  if (inStr) out += '"';
+  out = out.replace(/,\s*$/, "").replace(/,\s*"[^"]*$/, "");
+  while (stack.length) out += stack.pop();
+  return out;
+}
+
+/**
+ * Parse the tool-call arguments into JSON, tolerating markdown ```json fences,
+ * surrounding prose, and leaked tool-wrapper tags. Throws with a diagnostic
+ * snippet if every strategy fails.
  */
 function parseToolJson(rawArgs: string): unknown {
-  const attempts: string[] = [rawArgs];
   const stripped = rawArgs
     .trim()
     .replace(/^```(?:json)?/i, "")
     .replace(/```$/, "")
     .trim();
-  attempts.push(stripped);
-  const first = stripped.indexOf("{");
-  const last = stripped.lastIndexOf("}");
-  if (first >= 0 && last > first) attempts.push(stripped.slice(first, last + 1));
+  const attempts: (string | null)[] = [rawArgs, stripped, salvageJson(rawArgs)];
 
   for (const candidate of attempts) {
+    if (!candidate) continue;
     try {
       return JSON.parse(candidate);
     } catch {
