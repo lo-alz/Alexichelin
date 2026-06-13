@@ -76,6 +76,8 @@ export const restaurantSchema = z.object({
   /** 1 (cheap) – 4 (very expensive). */
   priceLevel: z.coerce.number().int().min(1).max(4).catch(2),
   menuUrl: z.string().nullable().catch(null),
+  /** Reservation/booking link (OpenTable, Resy, Tock, or the venue's own), or null. */
+  bookingUrl: z.string().nullable().catch(null),
   summary: z.string().catch(""),
 });
 export type Restaurant = z.infer<typeof restaurantSchema>;
@@ -126,12 +128,26 @@ export const scoreCardJsonSchema = {
           type: ["string", "null"],
           description: "URL to the menu if one can be found, otherwise null.",
         },
+        bookingUrl: {
+          type: ["string", "null"],
+          description:
+            "Reservation/booking link (OpenTable, Resy, Tock, SevenRooms, or the venue's own 'book a table' page) if one is found in the web results, otherwise null.",
+        },
         summary: {
           type: "string",
           description: "1–2 sentence overview of the restaurant.",
         },
       },
-      required: ["name", "location", "cuisine", "priceRange", "priceLevel", "menuUrl", "summary"],
+      required: [
+        "name",
+        "location",
+        "cuisine",
+        "priceRange",
+        "priceLevel",
+        "menuUrl",
+        "bookingUrl",
+        "summary",
+      ],
     },
     sources: {
       type: "array",

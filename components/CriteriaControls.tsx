@@ -35,16 +35,25 @@ export default function CriteriaControls({
     onChange(criteria.filter((c) => c.id !== id));
   }
   function addCustom() {
-    const name = draft.trim();
-    if (!name) return;
-    if (criteria.some((c) => c.name.toLowerCase() === name.toLowerCase())) {
-      setDraft("");
-      return;
-    }
-    onChange([
-      ...criteria,
-      { id: `custom-${Date.now()}`, name, importance: 60, enabled: true, custom: true },
-    ]);
+    // Split on commas so "Baby access, parking" becomes two criteria.
+    const names = draft
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const existing = new Set(criteria.map((c) => c.name.toLowerCase()));
+    const additions: CriterionPref[] = [];
+    names.forEach((name, i) => {
+      if (existing.has(name.toLowerCase())) return;
+      existing.add(name.toLowerCase());
+      additions.push({
+        id: `custom-${Date.now()}-${i}`,
+        name,
+        importance: 60,
+        enabled: true,
+        custom: true,
+      });
+    });
+    if (additions.length) onChange([...criteria, ...additions]);
     setDraft("");
   }
 

@@ -29,6 +29,19 @@ export default function RestaurantHeader({ restaurant }: { restaurant: Restauran
         )}
       </div>
 
+      {restaurant.bookingUrl && (
+        <div className="mt-7">
+          <a
+            href={restaurant.bookingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="label inline-block border border-ink px-7 py-3 text-ink transition-colors hover:bg-ink hover:text-paper"
+          >
+            Book a table ↗
+          </a>
+        </div>
+      )}
+
       {restaurant.summary && (
         <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-ink/80">
           {restaurant.summary}

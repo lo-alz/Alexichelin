@@ -31,9 +31,19 @@ export default function SourceControls({
     onChange(sources.filter((s) => s.id !== id));
   }
   function add(name: string, custom = false) {
-    const n = name.trim();
-    if (!n || present.has(n.toLowerCase())) return;
-    onChange([...sources, { id: `src-${Date.now()}`, name: n, enabled: true, custom }]);
+    // Split on commas so several sources can be added at once.
+    const names = name
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const seen = new Set(present);
+    const additions: SourcePref[] = [];
+    names.forEach((n, i) => {
+      if (seen.has(n.toLowerCase())) return;
+      seen.add(n.toLowerCase());
+      additions.push({ id: `src-${Date.now()}-${i}`, name: n, enabled: true, custom });
+    });
+    if (additions.length) onChange([...sources, ...additions]);
   }
 
   return (

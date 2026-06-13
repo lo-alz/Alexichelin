@@ -48,7 +48,7 @@ Method:
 - Return exactly one entry per requested source, using the EXACT source name given above. Do NOT add any source that was not requested.
 - Normalize EVERY source to a 0–5 scale. Put the raw value in nativeRating (e.g. "4.5/5 (1,203 reviews)", "1 Michelin Star").
 - Be honest about confidence. If a source has little or no signal, set score to null and confidence to "low" rather than inventing a number. Never fabricate ratings or citations — only include URLs that appear in the provided web results.
-- Also capture basic facts: cuisine, price range + priceLevel (1–4), and a menu URL if one exists (else null).
+- Also capture basic facts: cuisine, price range + priceLevel (1–4), a menu URL if one exists (else null), and a reservation/booking link in bookingUrl (OpenTable, Resy, Tock, SevenRooms, or the venue's own "book a table" page) when one appears in the results — else null. Only use a URL you actually see in the web results.
 - combinedScore and starRating: provide your best estimate; they are recomputed server-side regardless.${criteriaBlock}
 
 Respond by calling the submit_scorecard function exactly once with the complete scorecard. Do not write a prose answer instead of calling the function.`;
